@@ -1,0 +1,68 @@
+name: Initialize
+
+on:
+  push:
+    branches: [dev, qa, uat, main]
+  pull_request:
+    branches: [dev, qa, uat, main]
+
+jobs:
+  init:
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v2
+      - name: Use Node.js
+        uses: actions/setup-node@v2
+        with:
+          node-version: '22.11.0'
+      - name: Check Docker containers
+        run: docker ps -a || echo "Docker not available!"
+      - name: Set environment variables
+        run: |
+          PACKAGE_VERSION=$(node -p "require('./package.json').haiVersion || '0.0.0'")
+          CLINE_VERSION=$(node -p "require('./package.json').version || '0.0.0'")
+          BUILD_VERSION="v$PACKAGE_VERSION"
+          BUILD_TAG="v$PACKAGE_VERSION"
+          if [ "${{ github.event_name }}" = "pull_request" ] || [ "${{ github.ref }}" = "refs/heads/dev" ] || [ "${{ github.ref }}" = "refs/heads/qa" ]; then
+            BUILD_VERSION="$BUILD_VERSION-${{ github.run_number }}"
+            BUILD_TAG="$BUILD_TAG/${{ github.run_number }}"
+          fi
+          PACKAGE_NAME=$(node -p "require('./package.json').name || 'hai-build'")
+          if [ "${{ github.ref }}" = "refs/heads/dev" ]; then
+            PACKAGE_NAME="$PACKAGE_NAME-dev"
+          elif [ "${{ github.ref }}" = "refs/heads/qa" ]; then
+            PACKAGE_NAME="$PACKAGE_NAME-qa"
+          elif [ "${{ github.ref }}" = "refs/heads/uat" ]; then
+            PACKAGE_NAME="$PACKAGE_NAME-uat"
+          fi
+          echo "PACKAGE_NAME=$PACKAGE_NAME" >> $GITHUB_ENV
+          echo "PACKAGE_VERSION=$PACKAGE_VERSION" >> $GITHUB_ENV
+          echo "CLINE_VERSION=$CLINE_VERSION" >> $GITHUB_ENV
+          echo "BUILD_VERSION=$BUILD_VERSION" >> $GITHUB_ENV
+          echo "BUILD_TAG=$BUILD_TAG" >> $GITHUB_ENV
+      - name: Print environment variables
+        run: |
+          echo "PACKAGE_NAME=${{ env.PACKAGE_NAME }}"
+          echo "PACKAGE_VERSION=${{ env.PACKAGE_VERSION }}"
+          echo "CLINE_VERSION=${{ env.CLINE_VERSION }}"
+          echo "BUILD_VERSION=${{ env.BUILD_VERSION }}"
+          echo "BUILD_TAG=${{ env.BUILD_TAG }}"
+          printenv
+      - name: Print Node.js and npm versions
+        run: |
+          node --version
+          npm --version
+      - name: Install dependencies
+        run: |
+          npm ci --cache .npm --prefer-offline
+          cd webview-ui && npm ci --cache .npm --prefer-offline && cd ..
+      - name: Cache dependencies
+        uses: actions/cache@v2
+        with:
+          path: |
+            .npm
+            node_modules
+            webview-ui/node_modules
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-

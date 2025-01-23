@@ -1,0 +1,47 @@
+name: Lint
+
+on:
+  push:
+    branches: [dev, qa, uat, main]
+  pull_request:
+    branches: [dev, qa, uat, main]
+
+jobs:
+  check-types:
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v2
+      - name: Use Node.js
+        uses: actions/setup-node@v2
+        with:
+          node-version: '22.11.0'
+      - name: Restore cache
+        uses: actions/cache@v2
+        with:
+          path: |
+            .npm
+            node_modules
+            webview-ui/node_modules
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+      - name: Check types
+        run: npm run check-types
+
+  lint:
+    needs: check-types
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v2
+      - name: Use Node.js
+        uses: actions/setup-node@v2
+        with:
+          node-version: '22.11.0'
+      - name: Restore cache
+        uses: actions/cache@v2
+        with:
+          path: |
+            .npm
+            node_modules
+            webview-ui/node_modules
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+      - name: Run linter
+        run: npm run lint

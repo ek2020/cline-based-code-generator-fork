@@ -1,0 +1,51 @@
+name: Notify
+
+on:
+  push:
+    branches: [dev, qa, uat, main]
+
+jobs:
+  notify:
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v2
+      - name: Use Node.js
+        uses: actions/setup-node@v2
+        with:
+          node-version: '22.11.0'
+      - name: Restore cache
+        uses: actions/cache@v2
+        with:
+          path: |
+            .npm
+            node_modules
+            webview-ui/node_modules
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+      - name: Set environment variables
+        run: |
+          echo "PACKAGE_NAME=${{ env.PACKAGE_NAME }}" >> $GITHUB_ENV
+          echo "BUILD_VERSION=${{ env.BUILD_VERSION }}" >> $GITHUB_ENV
+          if [ "${{ github.ref }}" = "refs/heads/dev" ]; then
+            echo "NOTIFICATION_URL=${{ secrets.DEV_NOTIFICATION_URL }}" >> $GITHUB_ENV
+            echo "MENTION_LIST=${{ secrets.NOTIFICATION_DEV_LIST }}" >> $GITHUB_ENV
+          elif [ "${{ github.ref }}" = "refs/heads/qa" ]; then
+            echo "NOTIFICATION_URL=${{ secrets.QA_NOTIFICATION_URL }}" >> $GITHUB_ENV
+            echo "MENTION_LIST=${{ secrets.NOTIFICATION_QA_LIST }}" >> $GITHUB_ENV
+          elif [ "${{ github.ref }}" = "refs/heads/uat" ]; then
+            echo "NOTIFICATION_URL=${{ secrets.UAT_NOTIFICATION_URL }}" >> $GITHUB_ENV
+            echo "MENTION_LIST=${{ secrets.NOTIFICATION_UAT_LIST }}" >> $GITHUB_ENV
+          elif [ "${{ github.ref }}" = "refs/heads/main" ]; then
+            echo "NOTIFICATION_URL=${{ secrets.PROD_NOTIFICATION_URL }}" >> $GITHUB_ENV
+            echo "MENTION_LIST=${{ secrets.NOTIFICATION_PROD_LIST }}" >> $GITHUB_ENV
+          fi
+      - name: Print environment
+        run: printenv
+      - name: Run notification script
+        run: |
+          node ./scripts/notify.mjs
+          echo "Notifying release ${{ env.PACKAGE_NAME }}:${{ env.BUILD_VERSION }}"
+      - name: Set environment
+        run: |
+          echo "environment=${{ github.ref_name }}" >> $GITHUB_OUTPUT
+    environment:
+      name: ${{ github.ref_name }}

@@ -1,0 +1,62 @@
+name: Build
+
+on:
+  push:
+    branches: [dev, qa, uat, main]
+  pull_request:
+    branches: [dev, qa, uat, main]
+
+jobs:
+  mock_build:
+    if: github.event_name == 'pull_request'
+    needs: []
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v2
+      - name: Use Node.js
+        uses: actions/setup-node@v2
+        with:
+          node-version: '22.11.0'
+      - name: Restore cache
+        uses: actions/cache@v2
+        with:
+          path: |
+            .npm
+            node_modules
+            webview-ui/node_modules
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+      - name: Print environment
+        run: printenv
+      - name: Mock build
+        run: npx @vscode/vsce package
+
+  build:
+    if: github.event_name != 'pull_request'
+    needs: []
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v2
+      - name: Use Node.js
+        uses: actions/setup-node@v2
+        with:
+          node-version: '22.11.0'
+      - name: Restore cache
+        uses: actions/cache@v2
+        with:
+          path: |
+            .npm
+            node_modules
+            webview-ui/node_modules
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+      - name: Print environment
+        run: printenv
+      - name: Build VSIX package
+        run: |
+          echo "Build filename - ${{ env.PACKAGE_NAME }}-${{ env.BUILD_VERSION }}.vsix"
+          npx @vscode/vsce package --out "${{ env.PACKAGE_NAME }}-${{ env.BUILD_VERSION }}.vsix"
+      - name: Upload artifact
+        uses: actions/upload-artifact@v2
+        with:
+          name: vsix-package
+          path: ${{ env.PACKAGE_NAME }}-${{ env.BUILD_VERSION }}.vsix
+          retention-days: 90
